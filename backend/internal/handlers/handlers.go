@@ -4,9 +4,7 @@ import (
     "database/sql"
     "encoding/json"
     "net/http"
-    "os"
     "strconv"
-    "strings"
     "time"
 
     "media-sequencer/internal/database"
@@ -28,17 +26,10 @@ func NewRouter(db *sql.DB) http.Handler {
             return
         }
 
-        sync, _ := database.GetSyncState(db)
-        if sync != nil {
-            elapsed := int(time.Since(sync.StartedAt).Seconds())
-            if elapsed >= sync.DurationSeconds {
-                // Sync naturally expired. Credit full duration to paused time.
-                database.AddPausedSecondsToWindows(db, sync.DurationSeconds)
-                database.ClearSyncState(db)
-                sync = nil
-                // Reload windows since paused_seconds changed
-                windows, _ = database.GetWindows(db)
-            }
+        sync, changed := resolveSyncState(db, false)
+        if changed {
+            // Reload windows since paused_seconds changed
+            windows, _ = database.GetWindows(db)
         }
 
         // Fetch media item for sync override if active
@@ -131,15 +122,7 @@ func NewRouter(db *sql.DB) http.Handler {
     })
 
     mux.HandleFunc("GET /api/sync", func(w http.ResponseWriter, r *http.Request) {
-        sync, _ := database.GetSyncState(db)
-        if sync != nil {
-            elapsed := int(time.Since(sync.StartedAt).Seconds())
-            if elapsed >= sync.DurationSeconds {
-                database.AddPausedSecondsToWindows(db, sync.DurationSeconds)
-                database.ClearSyncState(db)
-                sync = nil
-            }
-        }
+        sync, _ := resolveSyncState(db, false)
         
         response := map[string]any{
             "is_active": sync != nil,
@@ -167,16 +150,7 @@ func NewRouter(db *sql.DB) http.Handler {
         }
 
         // Stop existing sync if any and credit time before starting a new one
-        sync, _ := database.GetSyncState(db)
-        if sync != nil {
-            elapsed := int(time.Since(sync.StartedAt).Seconds())
-            if elapsed < sync.DurationSeconds {
-                database.AddPausedSecondsToWindows(db, elapsed)
-            } else {
-                database.AddPausedSecondsToWindows(db, sync.DurationSeconds)
-            }
-            database.ClearSyncState(db)
-        }
+        resolveSyncState(db, true)
 
         // If duration is not provided, use the media's natural duration
         if input.DurationSeconds <= 0 {
@@ -197,16 +171,7 @@ func NewRouter(db *sql.DB) http.Handler {
     })
 
     mux.HandleFunc("POST /api/sync/clear", func(w http.ResponseWriter, r *http.Request) {
-        sync, _ := database.GetSyncState(db)
-        if sync != nil {
-            elapsed := int(time.Since(sync.StartedAt).Seconds())
-            if elapsed < sync.DurationSeconds {
-                database.AddPausedSecondsToWindows(db, elapsed)
-            } else {
-                database.AddPausedSecondsToWindows(db, sync.DurationSeconds)
-            }
-            database.ClearSyncState(db)
-        }
+        resolveSyncState(db, true)
         writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
     })
 
@@ -231,33 +196,8 @@ func applySyncOverride(sync *models.SyncState, syncMedia *models.Media, original
 }
 
 func withCORS(next http.Handler) http.Handler {
-    allowed := os.Getenv("ALLOWED_ORIGINS")
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        origin := r.Header.Get("Origin")
-
-        if allowed == "" || allowed == "*" {
-            if origin != "" {
-                w.Header().Set("Access-Control-Allow-Origin", origin)
-            } else {
-                w.Header().Set("Access-Control-Allow-Origin", "*")
-            }
-        } else {
-            matched := false
-            for _, o := range strings.Split(allowed, ",") {
-                if strings.TrimSpace(o) == origin {
-                    w.Header().Set("Access-Control-Allow-Origin", origin)
-                    matched = true
-                    break
-                }
-            }
-            if !matched {
-                // Fallback to first configured origin
-                first := strings.TrimSpace(strings.Split(allowed, ",")[0])
-                w.Header().Set("Access-Control-Allow-Origin", first)
-            }
-        }
-
-        w.Header().Set("Vary", "Origin")
+        w.Header().Set("Access-Control-Allow-Origin", "*")
         w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
         w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
         if r.Method == http.MethodOptions {
@@ -276,4 +216,27 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
     writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// resolveSyncState manages the lifecycle of a sync broadcast.
+// It checks if a sync is active, and if it has naturally expired or if forceClear is true,
+// it credits the elapsed paused time to all windows and clears the sync state.
+// It returns the active sync (if any) and a boolean indicating if the state was just cleared.
+func resolveSyncState(db *sql.DB, forceClear bool) (*models.SyncState, bool) {
+    sync, _ := database.GetSyncState(db)
+    if sync == nil {
+        return nil, false
+    }
+    
+    elapsed := int(time.Since(sync.StartedAt).Seconds())
+    if forceClear || elapsed >= sync.DurationSeconds {
+        if elapsed > sync.DurationSeconds {
+            elapsed = sync.DurationSeconds
+        }
+        database.AddPausedSecondsToWindows(db, elapsed)
+        database.ClearSyncState(db)
+        return nil, true
+    }
+    
+    return sync, false
 }

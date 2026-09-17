@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getWindows, getSync, getAllMedia, startSync, clearSync, addMedia } from './services/api';
+import { getWindows, getSync, getAllMedia, startSync, clearSync, addMedia, BASE } from './services/api';
 import MediaWindow from './components/MediaWindow';
 import SyncControls from './components/SyncControls';
 import AddMediaForm from './components/AddMediaForm';
@@ -26,7 +26,7 @@ export default function App() {
       setError(null);
     } catch (err) {
       console.error('Fetch error:', err);
-      setError('Unable to connect to backend service (http://localhost:8080). Make sure the Go backend is running.');
+      setError(`Unable to connect to backend service (${BASE}). Make sure the backend service is running and CORS is configured.`);
     } finally {
       setLoading(false);
     }
