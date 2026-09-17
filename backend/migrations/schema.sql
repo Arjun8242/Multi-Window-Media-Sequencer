@@ -34,12 +34,14 @@ INSERT INTO windows (id, name) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Reset sequence if needed after explicit id insertion
-SELECT setval('windows_id_seq', (SELECT MAX(id) FROM windows));
+SELECT setval('windows_id_seq', (SELECT COALESCE(MAX(id), 1) FROM windows));
 
-INSERT INTO media (window_id, title, media_type, media_url, duration_seconds, display_order) VALUES
-    (1, 'Welcome Image', 'image', 'https://picsum.photos/id/1015/1280/720', 10, 1),
-    (1, 'Sample Clip',   'video', 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', 12, 2),
-    (2, 'Promo Banner',  'image', 'https://picsum.photos/id/1025/1280/720', 8, 1),
-    (2, 'Quiet Interval','blank', '', 5, 2),
-    (3, 'Notice',        'image', 'https://picsum.photos/id/1035/1280/720', 10, 1)
-ON CONFLICT DO NOTHING;
+INSERT INTO media (id, window_id, title, media_type, media_url, duration_seconds, display_order) VALUES
+    (1, 1, 'Welcome Image', 'image', 'https://picsum.photos/id/1015/1280/720', 10, 1),
+    (2, 1, 'Sample Clip',   'video', 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4', 12, 2),
+    (3, 2, 'Promo Banner',  'image', 'https://picsum.photos/id/1025/1280/720', 8, 1),
+    (4, 2, 'Quiet Interval','blank', '', 5, 2),
+    (5, 3, 'Notice',        'image', 'https://picsum.photos/id/1035/1280/720', 10, 1)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('media_id_seq', (SELECT COALESCE(MAX(id), 1) FROM media));

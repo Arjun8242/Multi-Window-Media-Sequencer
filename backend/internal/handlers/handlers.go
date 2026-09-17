@@ -6,6 +6,7 @@ import (
     "net/http"
     "os"
     "strconv"
+    "strings"
     "time"
 
     "media-sequencer/internal/database"
@@ -231,11 +232,31 @@ func applySyncOverride(sync *models.SyncState, syncMedia *models.Media, original
 
 func withCORS(next http.Handler) http.Handler {
     allowed := os.Getenv("ALLOWED_ORIGINS")
-    if allowed == "" {
-        allowed = "http://localhost:5173"
-    }
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Access-Control-Allow-Origin", allowed)
+        origin := r.Header.Get("Origin")
+
+        if allowed == "" || allowed == "*" {
+            if origin != "" {
+                w.Header().Set("Access-Control-Allow-Origin", origin)
+            } else {
+                w.Header().Set("Access-Control-Allow-Origin", "*")
+            }
+        } else {
+            matched := false
+            for _, o := range strings.Split(allowed, ",") {
+                if strings.TrimSpace(o) == origin {
+                    w.Header().Set("Access-Control-Allow-Origin", origin)
+                    matched = true
+                    break
+                }
+            }
+            if !matched {
+                // Fallback to first configured origin
+                first := strings.TrimSpace(strings.Split(allowed, ",")[0])
+                w.Header().Set("Access-Control-Allow-Origin", first)
+            }
+        }
+
         w.Header().Set("Vary", "Origin")
         w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
         w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")

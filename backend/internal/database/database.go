@@ -23,15 +23,21 @@ func Connect() (*sql.DB, error) {
     }
 
     // Attempt to run the schema migration automatically
-    schemaPath := filepath.Join("migrations", "schema.sql")
-    if _, err := os.Stat(schemaPath); err == nil {
-        schemaBytes, err := os.ReadFile(schemaPath)
-        if err == nil {
-            _, execErr := db.Exec(string(schemaBytes))
-            if execErr != nil {
-                fmt.Printf("Warning: failed to execute schema.sql automatically: %v\n", execErr)
-            } else {
-                fmt.Println("Schema initialized/verified successfully.")
+    possiblePaths := []string{
+        filepath.Join("migrations", "schema.sql"),
+        filepath.Join("backend", "migrations", "schema.sql"),
+    }
+    for _, path := range possiblePaths {
+        if _, err := os.Stat(path); err == nil {
+            schemaBytes, err := os.ReadFile(path)
+            if err == nil {
+                _, execErr := db.Exec(string(schemaBytes))
+                if execErr != nil {
+                    fmt.Printf("Warning: failed to execute schema.sql automatically: %v\n", execErr)
+                } else {
+                    fmt.Println("Schema initialized/verified successfully from", path)
+                }
+                break
             }
         }
     }
