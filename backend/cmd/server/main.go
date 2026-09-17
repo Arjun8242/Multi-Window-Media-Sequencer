@@ -34,6 +34,9 @@ func loadEnv(filename string) {
             }
         }
     }
+    if err := scanner.Err(); err != nil {
+        log.Printf("Warning: error reading %s: %v", filename, err)
+    }
 }
 
 func main() {
