@@ -1,5 +1,5 @@
 module media-sequencer
 
-go 1.26.3
+go 1.22
 
-require github.com/lib/pq v1.12.3 // indirect
+require github.com/lib/pq v1.12.3 

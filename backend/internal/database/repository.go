@@ -20,6 +20,9 @@ func GetWindows(db *sql.DB) ([]models.Window, error) {
         }
         windows = append(windows, w)
     }
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
     return windows, nil
 }
 
@@ -41,6 +44,9 @@ func GetPlaylist(db *sql.DB, windowID int64) ([]models.Media, error) {
         }
         items = append(items, m)
     }
+    if err := rows.Err(); err != nil {
+        return nil, err
+    }
     return items, nil
 }
 
@@ -61,6 +67,9 @@ func GetAllMedia(db *sql.DB) ([]models.Media, error) {
             return nil, err
         }
         items = append(items, m)
+    }
+    if err := rows.Err(); err != nil {
+        return nil, err
     }
     return items, nil
 }
