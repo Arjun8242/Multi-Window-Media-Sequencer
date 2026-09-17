@@ -1,0 +1,27 @@
+# Environment files
+.env
+.env.*
+*.env
+backend/.env
+frontend/.env
+
+# Node modules & dependencies
+node_modules/
+**/node_modules/
+
+# Docs & assignment notes
+docs/
+**/docs/
+backend/docs/
+*.pdf
+
+# Build and distribution artifacts
+dist/
+dist-ssr/
+*.local
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
